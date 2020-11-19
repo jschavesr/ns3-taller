@@ -34,40 +34,7 @@
 // the layout is affected by the parameters given to GridPositionAllocator;
 // by default, GridWidth is 5 and numNodes is 25..
 //
-// There are a number of command-line options available to control
-// the default behavior.  The list of available command-line options
-// can be listed with the following command:
-// ./waf --run "wifi-simple-adhoc-grid --help"
-//
-// Note that all ns-3 attributes (not just the ones exposed in the below
-// script) can be changed at command line; see the ns-3 documentation.
-//
-// For instance, for this configuration, the physical layer will
-// stop successfully receiving packets when distance increases beyond
-// the default of 500m.
-// To see this effect, try running:
-//
-// ./waf --run "wifi-simple-adhoc --distance=500"
-// ./waf --run "wifi-simple-adhoc --distance=1000"
-// ./waf --run "wifi-simple-adhoc --distance=1500"
-//
-// The source node and sink node can be changed like this:
-//
-// ./waf --run "wifi-simple-adhoc --sourceNode=20 --sinkNode=10"
-//
-// This script can also be helpful to put the Wifi layer into verbose
-// logging mode; this command will turn on all wifi logging:
-//
-// ./waf --run "wifi-simple-adhoc-grid --verbose=1"
-//
-// By default, trace file writing is off-- to enable it, try:
-// ./waf --run "wifi-simple-adhoc-grid --tracing=1"
-//
-// When you are done tracing, you will notice many pcap trace files
-// in your directory.  If you have tcpdump installed, you can try this:
-//
-// tcpdump -r wifi-simple-adhoc-grid-0-0.pcap -nn -tt
-//
+
 
 #include "ns3/command-line.h"
 #include "ns3/config.h"
@@ -91,7 +58,7 @@
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("WifiSimpleAdhocGrid");
-
+double distance = 500;  // m
 /*
 Define observation space
 */
@@ -142,8 +109,7 @@ Ptr<OpenGymDataContainer> MyGetObservation(void)
   uint32_t nodeNum = 1;
   std::vector<uint32_t> shape = {nodeNum,};
   Ptr<OpenGymBoxContainer<uint32_t> > box = CreateObject<OpenGymBoxContainer<uint32_t> >(shape);
-
-  uint32_t value = 24;
+  uint32_t value = distance;
   box->AddValue(value);
 
 
@@ -190,15 +156,16 @@ bool MyExecuteActions(Ptr<OpenGymDataContainer> action)
   std::vector<uint32_t> actionVector = box->GetData();
 
   
-  uint32_t distance = actionVector.at(0);
+  uint32_t dist = actionVector.at(0);
   mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
                                  "MinX", DoubleValue (0.0),
                                  "MinY", DoubleValue (0.0),
-                                 "DeltaX", DoubleValue (distance),
-                                 "DeltaY", DoubleValue (distance),
+                                 "DeltaX", DoubleValue (dist),
+                                 "DeltaY", DoubleValue (dist),
                                  "GridWidth", UintegerValue (5),
                                  "LayoutType", StringValue ("RowFirst"));
 
+  distance = dist;
 
   return true;
 }
@@ -241,16 +208,16 @@ static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize,
 int main (int argc, char *argv[])
 {
   std::string phyMode ("DsssRate1Mbps");
-  double distance = 500;  // m
+
   uint32_t packetSize = 1000; // bytes
-  uint32_t numPackets = 1;
+  uint32_t numPackets = 10;
   uint32_t numNodes = 25;  // by default, 5x5
   uint32_t sinkNode = 0;
   uint32_t sourceNode = 24;
   double interval = 1.0; // seconds
   uint32_t openGymPort = 5555;
   double simulationTime = 10; //seconds
-  double envStepTime = 0.1; //seconds, ns3gym env step time interval
+  double envStepTime = 1; //seconds, ns3gym env step time interval
   
   bool verbose = false;
   bool tracing = false;
@@ -363,10 +330,13 @@ int main (int argc, char *argv[])
   // Give OLSR time to converge-- 30 seconds perhaps
  
 
-  NS_LOG_UNCOND ("send");
-  source->Send (Create<Packet> (packetSize));
+
+    Simulator::Schedule (Seconds (30.0), &GenerateTraffic,
+                       source, packetSize, numPackets, interPacketInterval);
+
       
     // OpenGym Env
+    
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
   openGymInterface->SetGetActionSpaceCb( MakeCallback (&MyGetActionSpace) );
   openGymInterface->SetGetObservationSpaceCb( MakeCallback (&MyGetObservationSpace) );
@@ -383,7 +353,8 @@ int main (int argc, char *argv[])
   NS_LOG_UNCOND ("Testing from node " << sourceNode << " to " << sinkNode << " with grid distance " << distance);
 
   NS_LOG_UNCOND ("Simulation start");
-  Simulator::Stop (Seconds (simulationTime));
+   Simulator::Stop (Seconds (60.0));
+
   Simulator::Run ();
   NS_LOG_UNCOND ("Simulation stop");
 

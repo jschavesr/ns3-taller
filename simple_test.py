@@ -19,8 +19,8 @@ startSim = bool(args.start)
 iterationNum = int(args.iterations)
 
 port = 5555
-simTime = 20 # seconds
-stepTime = 0.5  # seconds
+simTime = 60 # seconds
+stepTime = 5 # seconds
 seed = 0
 simArgs = {"--simTime": simTime,
            "--testArg": 123}
@@ -38,6 +38,7 @@ print("Action space: ", ac_space, ac_space.dtype)
 
 stepIdx = 0
 currIt = 0
+fr = 0
 
 try:
     while True:
@@ -45,23 +46,35 @@ try:
         obs = env.reset()
         print("Step: ", stepIdx)
         print("---obs:", obs)
-
+        to = list(obs)[0]*10
         while True:
             stepIdx += 1
             action = env.action_space.sample()
+            mid =   (int)((fr+to)/2)
+            action[0] = mid
             print("---action: ", action)
 
             print("Step: ", stepIdx)
             obs, reward, done, info = env.step(action)
             print("---obs, reward, done, info: ", obs, reward, done, info)
-
+            if (reward > 0):
+                fr = mid
+            else:
+                to = mid
             if done:
                 stepIdx = 0
                 if currIt + 1 < iterationNum:
                     env.reset()
                 break
+            print(fr, to)
+            if fr >= to:
+                env.reset()
+                stepIdx=0
+                break
+            
 
         currIt += 1
+     
         if currIt == iterationNum:
             break
 
